@@ -14,8 +14,13 @@ def get_patch(oldtxt:list[str], newtxt:list[str])->list[DisServ_pb2.single_patch
     '''
     diff_gen = difflib.unified_diff(oldtxt, newtxt)
     # 跳过前面两个entry
-    for i in range(2):
-        next(diff_gen)
+    try:
+        for i in range(2):
+            next(diff_gen)
+    # 说明两个文本没有变化, 就返回一个空列表
+    except StopIteration:
+        return []
+
 
     alter_dict = []
     '''

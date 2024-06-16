@@ -272,7 +272,7 @@ class server(DisServ_pb2_grpc.DisServServicer):
                     doc_info_serial = request.SerializeToString()
                     if self.redisCli.hexists("share_doc", doc_info_serial) and self.redisCli.hexists("dup_doc_ver", doc_info_serial):
                     # 说明还没被删除, 赶紧传输
-                        ts = self.redisCli.hget("dup_doc_ver", doc_info_serial)
+                        ts = int(self.redisCli.hget("dup_doc_ver", doc_info_serial))
                         return DisServ_pb2.document(doc_info = request, time_stamp = ts, content = file_content)
                         
             except PermissionError:
@@ -377,17 +377,18 @@ class server(DisServ_pb2_grpc.DisServServicer):
                         gap = patchLst[-1].time_stamp - cur_ts
                         # 满足阈值条件, 开始写入
                         if gap > self.threshold:
-                            doc_info = DisServ_pb2.document_info().ParseFromString(doc_info_serial)
+                            doc_info = DisServ_pb2.document_info()
+                            doc_info.ParseFromString(doc_info_serial)
                             file_path = os.path.join(self.share_path, 
-                                                    "-".join(str(doc_info.doc_ownerID), doc_info.doc_descriptor, doc_info.doc_name))
+                                                    "-".join([str(doc_info.doc_ownerID), doc_info.doc_descriptor, doc_info.doc_name]))
                             
                             if os.path.exists(file_path):
                                 # 若文件存在, 开始进行补丁的写入
                                 raw_file = []
                                 with open(file_path, "r", encoding="utf-8") as file:
-                                    raw_file.append(line.rstrip() for line in file)
+                                    raw_file = [line.rstrip() for line in file]
                                 for i in range(len(patchLst)-gap, len(patchLst)):
-                                    raw_file = apply_patch_cover(patchLst[i], raw_file)
+                                    raw_file = apply_patch_cover(list(patchLst[i].items), raw_file)
                                 with open(file_path, "w", encoding="utf-8") as file:
                                     file.write('\n'.join(raw_file))
                                 self.redisCli.hset("dup_doc_ver", doc_info_serial, patchLst[-1].time_stamp)

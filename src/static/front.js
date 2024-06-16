@@ -205,7 +205,10 @@ document.getElementById('upload-patch-btn').addEventListener('click', function()
                 const modalElement = document.getElementById('informModal');
                 const modal = new bootstrap.Modal(modalElement);
                 modal.show();
+                // 说明版本过老, 那就立刻更新
+                checkUpdata();
                 throw new Error('Err');
+                
             }
             else{
                 // 提示用户上传成功
@@ -213,7 +216,8 @@ document.getElementById('upload-patch-btn').addEventListener('click', function()
                 cont_ele.innerText = '上传成功, 等待服务器处理';
                 const modalElement = document.getElementById('informModal');
                 const modal = new bootstrap.Modal(modalElement);
-                modal.show();               
+                modal.show();
+                checkUpdata();               
             }
             
         }).catch(error => {
@@ -222,10 +226,6 @@ document.getElementById('upload-patch-btn').addEventListener('click', function()
     }
 });
 
-//需要实现一个每隔一定时隙就重复调用的函数
-function keepDocAlive(doc_info){
-
-}
 
 document.addEventListener('keydown', function(event) {
     if (event.ctrlKey && event.key === 's') {

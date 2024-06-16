@@ -519,6 +519,8 @@ class client():
         doc_info = doc_indicator.doc_info
 
         patch_items = get_patch(oldtxt=old_cont, newtxt=new_cont)
+        if len(patch_items) == 0:
+            return True
         usr_info = DisServ_pb2.usr_info(usr_name = self.usr_name, usr_ID=self.usr_ID)
 
         submit_patch = DisServ_pb2.patch(time_stamp = time_stamp,

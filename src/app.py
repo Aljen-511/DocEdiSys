@@ -91,13 +91,14 @@ def obtain_doc():
             abort(404)
         else: 
             doc_content, time_stamp = res
-            return jsonify(document = doc_content, doc_name = doc_info_dict["doc_name"], time_stamp = time_stamp), 200
+            # 加上list, 保证获取的是list而不是消息对象
+            return jsonify(document = list(doc_content), doc_name = doc_info_dict["doc_name"], time_stamp = time_stamp), 200
     elif request.method == 'GET':
         # 调用access_document的get_update功能, 进行缓冲区的更新
         res =  Client_.access_document(doc_info_dict=None)
         if len(res) != 0:
             doc_content, time_stamp = res
-            return jsonify(document = doc_content, time_stamp = time_stamp),200
+            return jsonify(document = list(doc_content), time_stamp = time_stamp),200
         else:
             abort(404)
 
@@ -121,9 +122,6 @@ def upload_patch():
         abort(404)
 
 
-    Client_.upload_patch(patch)
-
-    pass
 # 接下来定义每个接口要做的任务
 
 # 1. 在js文件中, 实现ctrl+s上传补丁的操作
@@ -141,5 +139,5 @@ def recall():
 
 if __name__ == "__main__":
     
-    app.run(host="127.0.0.1", port = 10001, debug=True)
+    app.run(host="127.0.0.1", port = 10001)
     pass
