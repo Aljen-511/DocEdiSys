@@ -1,12 +1,18 @@
+import os
+import sys
+cur_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(cur_dir, "gRPC"))
 from patch import get_patch, apply_patch_cover
 import redis
 from gRPC import DisServ_pb2
 from gRPC import DisServ_pb2_grpc
 from gRPC.atomScript import LuaScript
-import os
+import grpc
+
 import yaml
 from concurrent import futures
 import threading
+import time
 
 # 1. 所有message类的定义在DisDerv_pb2中, 当要返回指定信息时，可以根据这些类初始化指定对象
 # 2. 继承了servicer类之后, 需要完成service中定义的实现
@@ -27,8 +33,8 @@ class server(DisServ_pb2_grpc.DisServServicer):
     def __init__(self):
         # 初始化服务器
         super(server, self).__init__()
-        # 配置文件默认在src目录下
-        self.server_conf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"serCfg.yaml")
+        # 配置文件默认在src的cfg目录下
+        self.server_conf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"cfg/serCfg.yaml")
         with open(self.server_conf_path, 'r', encoding='utf-8') as f:
             cfg = yaml.load(f.read(), Loader=yaml.FullLoader)
         self.redisCli = redis.Redis(host=cfg["redis"]["host"],port=cfg["redis"]["port"],db=cfg["redis"]["db"])
@@ -36,8 +42,14 @@ class server(DisServ_pb2_grpc.DisServServicer):
         # 共享文档的路径
         self.share_path = cfg["share_path"]
 
-        # 每个文档允许在内存中实时存储的补丁数量(k)
+        # 每个文档允许在内存中实时存储的补丁数量下限(k)
         self.k = cfg["num_patches"]
+
+        # 文档版本与最新补丁相差超过该阈值, 才会写入修改
+        self.threshold = cfg["threshold"]
+
+        # 规定服务器的监听端口
+        self.serPort = cfg["listen_port"]
 
         # 初始化Lua脚本
         self.initial_scripts()
@@ -45,17 +57,26 @@ class server(DisServ_pb2_grpc.DisServServicer):
         # 确保用户ID分配操作的原子性
         self.ID_Info_mtx = threading.Lock()
 
+        # 确保文件批量写入补丁操作和请求文件操作的互斥
+        self.doc_mtx = threading.Lock()
+
         # 进行必要的redis初始化
         self.check_database()
 
-    def initial_scripts(self):
+        maintain_th = threading.Thread(target=self.maintain_th)
+        maintain_th.start()
+
+    def initial_scripts(self)-> None:
+        '''
+        初始化并注册Lua脚本
+        '''
         scripts = LuaScript()
         self.update_patch = self.redisCli.register_script(scripts.update_patch)
         self.init_share_doc = self.redisCli.register_script(scripts.init_share_doc)
         self.recall_doc = self.redisCli.register_script(scripts.recall_doc)
 
 
-    def check_database(self):
+    def check_database(self)-> None:
         '''
         检查数据库中是否存在预设的键, 若没有则进行创建, 并初始化
         '''
@@ -85,7 +106,6 @@ class server(DisServ_pb2_grpc.DisServServicer):
         
         
     def upload_patch(self, request, context):
-        # 完善自己的实现: 可以解析request，之后返回对应的类型
         '''
         request: patch类型信息,包含 <时间戳time_stamp, 申请客户信息appli_usr, 申请修改文档信息appli_doc, patch列表items>
         response: boolen_res类型信息, 象征性回复
@@ -108,9 +128,12 @@ class server(DisServ_pb2_grpc.DisServServicer):
             # 传入share_doc键, 传入文档的info(序列化), 传入当前patch时间戳; 
             # 传入patch_Lst_ID键, 传入当前patch(序列化)
             # 
-            self.redisCli.evalsha(self.update_patch, 2, "share_doc", patch_Lst_ID, 
-                                  req_doc_info_serial, time_stamp, patch_serial)
+            keys = ["share_doc", patch_Lst_ID]
+            args = [req_doc_info_serial, time_stamp, patch_serial]
+            self.update_patch(keys=keys, args=args)
             #------------------------#
+
+            # 无需关心是否成功写入, 因为服务器总是会发布最新的一致补丁
             return DisServ_pb2.boolen_res(accept_status = True)
 
     def login(self, request, context):
@@ -125,7 +148,7 @@ class server(DisServ_pb2_grpc.DisServServicer):
             #--------原子操作区-------#
             with self.ID_Info_mtx:
                 curMaxID = self.redisCli.get("max_usr_ID")
-                user_ID = curMaxID + 1
+                user_ID = int(curMaxID) + 1
                 self.redisCli.incr("max_usr_ID")
                 self.redisCli.hset("usrlst", user_ID, request.usr_name)
             #------------------------#
@@ -135,14 +158,14 @@ class server(DisServ_pb2_grpc.DisServServicer):
     
     def logout(self, request, context):
         '''
-        客户申请离线(实际并没有什么用处, 所以闲置了)
+        客户申请离线(实际并没有什么用处, 所以闲置了, 仅做了象征性的实现)
         request: usr_info类型信息
         '''
         # 1. 将该用户从在线用户列表中移除
         # 2. 即便是该用户存在着尚未召回的共享文档, 也允许该用户离线
         # 3. 将该用户移入离线用户列表, 并写入离线时间(若超过一定时间仍未重新登录, 则判定为不活跃用户)
         return DisServ_pb2.boolen_res(accept_status = True)
-        return super().logout(request, context)
+        
     
     def upload_document(self, request, context):
         '''
@@ -158,7 +181,9 @@ class server(DisServ_pb2_grpc.DisServServicer):
         # 先检查有没有上传过同一个文件
         doc_info_serial = request.doc_info.SerializeToString()
         if self.redisCli.hexists("share_doc",doc_info_serial):
-            return DisServ_pb2.boolen_res(accept_status = False)
+            # -做检查, 查看本地文件是否还存在, 若不存在, 就需要接收
+            # -若存在, 就算了
+            return DisServ_pb2.boolen_res(accept_status = True)
         doc_info = request.doc_info
         doc_name = "-".join([str(doc_info.doc_ownerID), doc_info.doc_descriptor, doc_info.doc_name])
         doc_path = os.path.join(self.share_path, doc_name)
@@ -175,13 +200,21 @@ class server(DisServ_pb2_grpc.DisServServicer):
         # 传入max_patch_list_ID键, 获取patch_ID
         # 传入doc_patch键, 将获取的patch_ID插入(这里只要获取patch_ID就行,因为空列表是无意义的)
         # 传入dup_doc_ver键, 对其进行初始化
-        self.redisCli.evalsha(self.init_share_doc, 4, "share_doc", "max_patch_list_ID", "doc_patch","dup_doc_ver",
-                              doc_info_serial)
+        keys = ["share_doc","max_patch_list_ID", "doc_patch","dup_doc_ver"]
+        args = [doc_info_serial]
+        self.init_share_doc(keys=keys, args=args)
         #----------------------------#
-        return DisServ_pb2.boolen_res(accept_status = True)
+        # 再检查一遍, 若成功写入就返回成功, 若没有则返回错误
+        if self.redisCli.hexists("share_doc", doc_info_serial):
+            return DisServ_pb2.boolen_res(accept_status = True)
+        else:
+            return DisServ_pb2.boolen_res(accept_status = False)
     
 
     def recall_document(self, request, context):
+        # TODO: 修复下面提到的bug
+        #这里有点问题: 在撤回文档之前, 应当确保将最新版本的副本同步到文档拥有者, 在此之前, 应当将某些键锁住#
+        #返回的类型应该更改为document
         '''
         request: document_info类型信息
         '''
@@ -196,7 +229,7 @@ class server(DisServ_pb2_grpc.DisServServicer):
         # 这里可能会有点问题: 当有客户在请求当前文档时, 删除失败
         if os.path.exists(file_path):
             try:
-                os.remove(file_path)
+                
                 doc_info = request.SerializeToString()
                 if not self.redisCli.hexists("share_doc", doc_info):
                     return DisServ_pb2.boolen_res(accept_status = False)
@@ -206,14 +239,17 @@ class server(DisServ_pb2_grpc.DisServServicer):
                 # 传入share_doc键, 传入doc_info(序列化), 删除doc_info(序列化)
                 # 传入doc_patch键, 根据doc_info获取对应的列表ID, 删除列表后再删除该域
                 # 传入dup_doc_ver键, 对其进行删除
-                self.redisCli.evalsha(self.recall_doc, 2, "share_doc", "doc_patch",
-                                    doc_info)
+                keys = ["share_doc", "doc_patch"]
+                args = [doc_info]
+                self.recall_doc(keys=keys, args=args)
                 #---------------------------#
+                os.remove(file_path)
                 return DisServ_pb2.boolen_res(accept_status = True)
             except PermissionError:
                 # 删除失败, 返回失败标识
                 return DisServ_pb2.boolen_res(accept_status = False)
 
+    # 还没debug
     def request_for_document(self, request, context):
         '''
         request: document_info类型信息
@@ -226,17 +262,19 @@ class server(DisServ_pb2_grpc.DisServServicer):
         if os.path.exists(file_path):
             try:
                 file_content = []
-                with open(file_path, "r", encoding="utf-8") as doc:
-                    # 这里在读文件时自动去掉末尾所有空白字符, 在客户端进行diff操作时, 也应该遵循一样的原则
-                    for line in doc:
-                        file_content.append(line.strip())
-                
-                doc_info_serial = request.SerializeToString()
-                if self.redisCli.hexists("share_doc", doc_info_serial) and self.redisCli.hexists("dup_doc_ver", doc_info_serial):
-                # 说明还没被删除, 赶紧传输
-                    ts = self.redisCli.hget("dup_doc_ver", doc_info_serial)
-                    return DisServ_pb2.document(doc_info = request, time_stamp = ts, content = file_content)
+                # 等待所有将补丁写入的操作完成
+                with self.doc_mtx:
+                    with open(file_path, "r", encoding="utf-8") as doc:
+                        # 这里在读文件时自动去掉末尾所有空白字符, 在客户端进行diff操作时, 也应该遵循一样的原则
+                        for line in doc:
+                            file_content.append(line.rstrip())
                     
+                    doc_info_serial = request.SerializeToString()
+                    if self.redisCli.hexists("share_doc", doc_info_serial) and self.redisCli.hexists("dup_doc_ver", doc_info_serial):
+                    # 说明还没被删除, 赶紧传输
+                        ts = self.redisCli.hget("dup_doc_ver", doc_info_serial)
+                        return DisServ_pb2.document(doc_info = request, time_stamp = ts, content = file_content)
+                        
             except PermissionError:
                 pass
         # doc_info = DisServ_pb2.document_info(doc_name="NULL",doc_descriptor="NULL",doc_ownerID=-1)
@@ -244,6 +282,7 @@ class server(DisServ_pb2_grpc.DisServServicer):
         return DisServ_pb2.document(time_stamp=-1)
         
     
+    # 还没debug, 或者说, 没de过真的有上传patch的bug
     def request_for_patch(self, request, context):
         '''
         request类型: patch
@@ -255,36 +294,123 @@ class server(DisServ_pb2_grpc.DisServServicer):
         # 首先一口气获取所有patch
         ts = request.time_stamp
         doc_info = request.appli_doc.SerializeToString()
+        #--原子操作--(可能需要另写一个Lua脚本确保操作原子性)
         patch_key = self.redisCli.hget("doc_patch", doc_info)
         patches = self.redisCli.lrange(patch_key,0,-1)
 
+
         # 之后, 根据时间戳的条件, 流式地发布时间戳超前于客户版本的补丁
-        for patch in patches:
-            patch = DisServ_pb2.patch().ParseFromString(patch)
-            if patch.time_stamp > ts:
+        #  😢这里需要修改: 若当前版本的下一个补丁没有出现在补丁列表时, 则返回相应的patch做提醒, 使客户端自主调用
+        #     request_for_document获取最新版本的副本
+
+        is_continuous = False
+        for patch_ in patches:
+            patch = DisServ_pb2.patch()
+            patch.ParseFromString(patch_)
+            # 判断是否有补丁恰好是当前版本的下一个版本
+            if patch.time_stamp == ts + 1:
+                is_continuous = True
+            # 若已经存在当前版本的下一个补丁, 那么将之后的所有补丁都上传
+            if is_continuous and patch.time_stamp > ts:
                 yield patch
+            # 否则, 说明当前版本太老了, 返回一个时间戳为-1的信息, 提醒用户重新获取副本
+            elif patch.time_stamp > ts:
+                yield DisServ_pb2.patch(time_stamp = -1)
+                break
         
         return
     
-
+    
     def request_for_sharelist(self, request, context):
         '''
         request类型: 象征性的boolen_res
+        返回类型: doc_list
         '''
         # 一键获取当前share_doc的所有键(list)
         fields = self.redisCli.hkeys("share_doc")
-
         doc_lst = []
         # 打包成doc_lst类型信息
         for item in fields:
-            cur_info = DisServ_pb2.document_info()
-            cur_info.ParseFromString(item)
-            doc_lst.append(cur_info)
+            # 这里鬼打墙纯属自己坑自己, 因为引入了空键' '
+            if item.decode() != ' ':
+                cur_info = DisServ_pb2.document_info()
+                cur_info.ParseFromString(item)
+                doc_lst.append(cur_info)
         return DisServ_pb2.doc_list(doc_info_list = doc_lst)
 
-    
+    def maintain_th(self):
+        # 每隔一段时间就调用一次, 尽量使每次间隔都不一样
+        time_gaps = [0.3,0.9,2.1,0.9,1.1]
+        gap_idx = 0
+        while True:
+            self.maintain_dup_doc()
+            time.sleep(time_gaps[gap_idx])
+            gap_idx += 1
+            gap_idx %= len(time_gaps)
 
 
 
-# def is_same_doc(doc_info1:DisServ_pb2.document_info, doc_info2:DisServ_pb2.document_info):
-#     return doc_info1.doc_name == doc_info2.doc_name and doc_info1.doc_descriptor == doc_info2.doc_descriptor and doc_info1.doc_ownerID == doc_info2.doc_ownerID
+# TODO: 实现一个线程, 时刻维护服务器文件副本的版本, 这事实上是一个极度消耗性能的操作, 同时也会使服务器的
+#       应答能力下降, 因为互斥此时服务器无法处理上传文件的业务
+    def maintain_dup_doc(self):
+        # 1. 获取文件列表-->2. 获取补丁列表-->3. 迭代式地写入
+
+        doc_infos_serial = self.redisCli.hkeys("share_doc")
+        # 与获取文件的操作互斥
+        with self.doc_mtx:
+            # 对所有文件, 遍历其补丁列表
+            for doc_info_serial in doc_infos_serial:
+                if doc_info_serial.decode() != " ":
+                    cur_ts = int(self.redisCli.hget("dup_doc_ver", doc_info_serial))
+                    patchLstID = self.redisCli.hget("doc_patch",doc_info_serial)
+                    patchLst_serial = self.redisCli.lrange(patchLstID, 0, -1)
+                    # 批量转成patch
+
+                    # 这里有很大的问题！！！！！ 但是已经做了初步的修改
+                    patchLst = []
+                    for patch in patchLst_serial:
+                        single_patch = DisServ_pb2.patch()
+                        single_patch.ParseFromString(patch)
+                        patchLst.append(single_patch)
+                    
+                    try:
+                        gap = patchLst[-1].time_stamp - cur_ts
+                        # 满足阈值条件, 开始写入
+                        if gap > self.threshold:
+                            doc_info = DisServ_pb2.document_info().ParseFromString(doc_info_serial)
+                            file_path = os.path.join(self.share_path, 
+                                                    "-".join(str(doc_info.doc_ownerID), doc_info.doc_descriptor, doc_info.doc_name))
+                            
+                            if os.path.exists(file_path):
+                                # 若文件存在, 开始进行补丁的写入
+                                raw_file = []
+                                with open(file_path, "r", encoding="utf-8") as file:
+                                    raw_file.append(line.rstrip() for line in file)
+                                for i in range(len(patchLst)-gap, len(patchLst)):
+                                    raw_file = apply_patch_cover(patchLst[i], raw_file)
+                                with open(file_path, "w", encoding="utf-8") as file:
+                                    file.write('\n'.join(raw_file))
+                                self.redisCli.hset("dup_doc_ver", doc_info_serial, patchLst[-1].time_stamp)
+
+                                # 开始维护补丁列表的数量
+                                if len(patchLst) > self.k:
+                                    self.redisCli.ltrim(patchLstID, -self.k, -1) 
+                            else:
+                                # TODO: 等待实现错误提示, 以及文件恢复的操作(后续有时间再做)
+                                # 文件恢复的操作应该留在请求补丁处, 之后通过某种机制, 确保只有一个用户发送副本
+                                pass
+                    except IndexError:
+                        # 说明逻辑错误了, 原子操作失效, 补丁列表已经清空, 但文档信息还在
+                        pass
+
+
+
+if __name__ == "__main__":
+    ServerHandel = server()
+    Server = grpc.server(futures.ThreadPoolExecutor(max_workers=16))
+    SerPort = ServerHandel.serPort
+    DisServ_pb2_grpc.add_DisServServicer_to_server( ServerHandel,Server)
+    Server.add_insecure_port('[::]:'+str(SerPort))
+    Server.start()
+    Server.wait_for_termination()
+    pass

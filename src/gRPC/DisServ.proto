@@ -51,7 +51,7 @@ message usr_info{
 
 message login_res{
   bool login_status = 1;
-  string usr_ID = 2;
+  int64 usr_ID = 2;
 }
 
 message document{
@@ -60,7 +60,7 @@ message document{
   repeated string content = 3;
 }
 
-// 三元组唯一地标识一个文档
+// 三元组唯一地标识一个文档(对服务器而言)
 message document_info{
   string doc_name = 1;
   string doc_descriptor = 2;
@@ -71,4 +71,10 @@ message doc_list{
   repeated document_info doc_info_list = 1;
 }
 
+
+// 四元组唯一地标识一个文档(对用户而言)
+message unique_doc_indicator{
+  document_info doc_info = 1;
+  string ser_IP = 2;
+}
 // python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=.  DisServ.proto

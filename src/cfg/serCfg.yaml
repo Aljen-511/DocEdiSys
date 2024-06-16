@@ -1,0 +1,12 @@
+redis:
+  host: 127.0.0.1
+  port: 6379
+  db: 0
+
+share_path: F:\课件寄存处\000_distributedSys\share
+
+num_patches: 20
+
+listen_port: 6621
+
+threshold: 5

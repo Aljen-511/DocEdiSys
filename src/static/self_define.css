@@ -1,0 +1,79 @@
+.titile-line{
+    background: #007bff;
+    color: white;
+    padding: 8px;
+    text-align: center;
+    
+
+    font-weight: bold;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 30px;
+    border-bottom-right-radius: 30px;
+    margin-bottom: 5px;
+}
+.titile-line:hover{
+    cursor: pointer;
+    opacity: 0.8;
+    
+}
+.upload-fake-btn{
+    color: #007bff;
+    font-weight: bold;
+
+}
+.upload-fake-btn:hover{
+    color: deepskyblue;
+    cursor: pointer;
+
+}
+
+.scroll-container {
+    height: calc(100vh / 12 * 9); /* 将高度设置为9行的高度 */
+    overflow-y: auto; 
+}
+.item-card {
+    margin-bottom: 5px;
+    border: 2px dashed rgba(0, 0, 0, 0.1);
+    border-radius: 0.25rem;
+    background-color:snow;
+    color:#004643;
+
+}
+.card-head{
+    color: whitesmoke;
+    font-weight: bold;
+}
+.edit-button{
+    background-color: #ff2d51;
+    border-radius: 20px;
+    color: whitesmoke;
+    font-size: 14px;
+    width: 75px;
+}
+.edit-button:hover{
+    background-color: #397d54;
+    color: white;
+}
+.doc-info{
+    min-width: 50px;
+    max-width: 150px;
+    overflow-x: auto;
+    max-height: 30px;
+
+
+
+}
+.doc-info:hover{
+    cursor: pointer;
+}
+.verify-button{
+    background-color: #2b91fee0;
+    border-radius: 20px;
+    color: whitesmoke;
+    font-size: 14px;
+    width: 75px;
+}
+.verify-button:hover{
+    background-color: #397d54;
+    color: white;
+}

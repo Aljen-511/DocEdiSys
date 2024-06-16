@@ -1,0 +1,14 @@
+redis:
+  host: 127.0.0.1
+  port: 6379
+  db: 1
+
+cache_path: F:\课件寄存处\000_distributedSys\cache
+
+server_ip: 127.0.0.1
+
+server_port: 6621
+
+basic_maintain_loop: 0.05
+
+max_update_period_nums: 100

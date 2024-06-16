@@ -1,8 +1,0 @@
-redis:
-  host: 127.0.0.1
-  port: 6379
-  db: 0
-
-share_path: F:\课件寄存处\000_distributedSys\src\share
-
-num_patches: 20

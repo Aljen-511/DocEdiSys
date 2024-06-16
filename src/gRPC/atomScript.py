@@ -8,7 +8,7 @@ local docInfo = ARGV[1]
 local timeStamp = ARGV[2]
 local patch = ARGV[3]
 
-locale curTs = redis.call('HGET', shareDocKey, docInfo)
+local curTs = redis.call('HGET', shareDocKey, docInfo)
 if tonumber(curTs)+1 == tonumber(timeStamp) then
     redis.call('RPUSH', docPatchKey, patch)
     redis.call('HINCRBY', shareDocKey, docInfo, 1)
@@ -29,15 +29,16 @@ local docInfo = ARGV[1]
 redis.call('HSET', shareDocKey, docInfo, 0)
 local patchLstID = redis.call('GET', maxPatchKey)
 local patchLstKey = 'PATCH'.. patchLstID
-redis.call('HSET', docPatchKey, doc_info, patchLstKey)
-redis.call('HSET', dupDocKey, doc_info, 0)
+redis.call('HSET', docPatchKey, docInfo, patchLstKey)
+redis.call('HSET', dupDocKey, docInfo, 0)
+redis.call('INCR', maxPatchKey)
 '''     
         
         
         self.recall_doc = '''
 local shareDocKey = KEYS[1]
 local docPatchKey = KEYS[2]
-local docInfo = AGRV[1]
+local docInfo = ARGV[1]
 
 redis.call('HDEL', shareDocKey, docInfo)
 local patchID = redis.call('HGET', docPatchKey, docInfo)

@@ -1,0 +1,6 @@
+redis
+flask
+grpcio
+grpcio-tools
+googleapis-common-protos
+protobuf-to-dict

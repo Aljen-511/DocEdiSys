@@ -5,54 +5,115 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文档在线编辑器</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="self_define.css">
+    <link rel="stylesheet" href="../static/self_define.css">
+    
+
 
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary custom-navbar" style="height: 80px;">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#" style="font-weight: bold;font-size: 28px;">DocEdiSys</a>
+            <a class="navbar-brand" href="/help" style="font-weight: bold;font-size: 28px;">DocEdiSys</a>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav mx-auto" style="display: inline-block;padding: 8px;border-radius: 40px;background-color:  #FFFFFA;">
                     
                     <li class="nav-item">
-                        <a class="nav-link" href="#" style="color: #007bff;font-weight: bold;padding-left: 10px;padding-right: 20px;">
+                        
+                        <a class="nav-link upload-fake-btn" id="upload-file-link" style="padding-right: 20px;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" class="bi bi-cloud-arrow-up" viewBox="0 0 16 16" style="margin-right: 15px;margin-left: 15px;">
                                 <path fill-rule="evenodd" d="M8 0a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 4.095 0 5.555 0 7.318 0 9.366 1.708 11 3.781 11H7.5V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V11h4.188C14.502 11 16 9.57 16 7.773c0-1.636-1.242-2.969-2.834-3.194C12.923 1.999 10.69 0 8 0zm-.5 14.5V11h1v3.5a.5.5 0 0 1-1 0z"/>
                             </svg>
                             上传文件
                         </a>
+                        
                     </li>
                 </ul>
                 <div class="d-flex", style="margin-right: 20px;">
                     <div class="dropdown">
-                        <a class="d-flex align-items-center text-white text-decoration-none" href="#" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-person-circle" viewBox="0 0 16 16">
+                        <a class="d-flex align-items-center text-white text-decoration-none"  id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-person-circle" viewBox="0 0 16 16" style="cursor: pointer;">
                                 <path d="M8 0a8 8 0 1 0 8 8 8 8 0 0 0-8-8zm0 3a2.5 2.5 0 1 1-2.5 2.5A2.5 2.5 0 0 1 8 3zm0 9c1.5 0 4 0 4 1v1H4v-1c0-1 2.5-1 4-1z"/>
                             </svg>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                            <li><a class="dropdown-item" href="#">{{user_status_operation}}</a></li>
+                            <li><a class="dropdown-item" data-bs-toggle="modal" data-bs-target="#loginModal" id="login-switch">登录</a></li>
+                            <!-- 隐藏的登录状态 -->
+                            <lable id = "login-status" style="display: none;">0</lable>
                         </ul>
                     </div>
                 </div>
             </div>
         </div>
     </nav>
-    <div class="container-fluid mt-5">
+    <div class="container-fluid mt-4">
         <div class="row">
         <!-- 左侧列，占据3列（占据屏幕宽度的1/4） -->
         <div class="col-md-3 left-container">
-          <!-- 上部容器 -->
+          
+            <!-- 上部容器 -->
           <div class="top-container mb-3">
-            <textarea name="share_list" class="form-control" rows="8" style="resize: vertical;" placeholder="🥳文档共享列表"></textarea>
+            <div class="card shadow">
+                <div class="card-header shadow  d-flex justify-content-between align-items-center bg-primary card-head">
+                    <span style="cursor:pointer;" title="刷新列表" id="refresh-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-repeat" viewBox="0 0 16 16">
+                            <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
+                            <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/>
+                        </svg>
+                        文档列表
+                    </span>
+
+                    <div class="dropdown">
+                        <button class="btn btn-secondary shadow dropdown-toggle" data-bs-toggle="dropdown" type="button" style="background-color: #2b91fee0;border-radius: 20px;border: none;">
+                            切换视图
+                        </button>
+                        <div class="dropdown-menu">
+                            <button class="dropdown-item" type="button" id="my-share-btn">我的共享</button>
+                            <button class="dropdown-item" type="button"id="share-btn" >多人共享</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="scroll-container">
+                    <div class="card-body" id="share-list" >
+                        <!-- 这里放置动态的表项 -->
+        
+                        <div class="item-card card-body d-flex justify-content-between align-items-center p-1">
+                            <div class="badge bg-warning rounded-pill">ID: 621</div>
+                            <div class="doc-info">当前尚未登录</div>
+                            <button class="btn edit-button" type="button" style="display: none;">编辑</button>
+                        </div>
+                            
+                        <div class="item-card card-body d-flex justify-content-between align-items-center p-1">
+                            <div class="badge bg-warning rounded-pill">ID: 101</div>
+                            <div class="doc-info">登录后查看共享文档</div>
+                            <button class="btn edit-button" type="button" style="display: none;">编辑</button>
+                        </div>
+
+                    </div>
+
+                    <div class="card-body" id="my-share-list" style="display: none;">
+                        <div class="item-card card-body d-flex justify-content-between align-items-center p-1">
+                            <div class="badge bg-warning rounded-pill">ID: 101</div>
+                            <div class="doc-info">登录后查看共享文档</div>
+                            <button class="btn edit-button" type="button" style="display: none;">编辑</button>
+                        </div>                      
+                    </div>
+
+                </div>
+            </div>
             <!-- 这里放置上部容器的内容 -->
           </div>
+
+          
           <!-- 下部容器 -->
-          <div class="bottom-container">
+          <!-- <div class="bottom-container">
+            <div class="titile-line shadow">
+                日志列表
+            </div>
             <textarea name="alter_list" class="form-control" rows="10" style="resize: vertical;" placeholder="🥳日志列表"></textarea>
-            <!-- 这里放置下部容器的内容 -->
-          </div>
+            
+          </div> -->
+
+
         </div>
         <!-- 右侧列，占据9列（占据屏幕宽度的3/4） -->
         <div class="col-md-9 right-container d-flex justify-content-center">
@@ -60,16 +121,18 @@
             <form method="post">
                 <div class="mb-3"> <!-- 这里是用来调整与下面的保存按钮的间距 -->
                   
-                    <div class="titile-line">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-code-slash" viewBox="0 0 16 16" style="margin-right: 20px;">
-                            <path d="M10.478 1.647a.5.5 0 1 0-.956-.294l-4 13a.5.5 0 0 0 .956.294l4-13zM4.854 4.146a.5.5 0 0 1 0 .708L1.707 8l3.147 3.146a.5.5 0 0 1-.708.708l-3.5-3.5a.5.5 0 0 1 0-.708l3.5-3.5a.5.5 0 0 1 .708 0zm6.292 0a.5.5 0 0 0 0 .708L14.293 8l-3.147 3.146a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5a.5.5 0 0 0-.708 0z"/>
-                        </svg>  
+                    <div class="titile-line shadow" id="title-line">
                         #文档标题
                     </div>
-                    <textarea name="file_content" class="form-control" rows="20" cols="120" style="resize: vertical;" placeholder="🥳文档编辑区" ></textarea>
+                    <label id="time-stamp" style="display: none;">-1</label>
+                    <textarea id="editor" name="file_content" class="form-control" rows="22" cols="120" readonly style="resize:none;" placeholder="🥳文档编辑区" >{{file_content}}</textarea>
                     
                 </div>
-                <button type="submit" class="btn btn-primary" style="margin-top: 10px;">保存</button>
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-primary shadow" style="margin-top: 10px;" id="upload-patch-btn" disabled>上传修改</button>
+                    <button type="button" class="btn btn-secondary shadow" style="margin-top: 10px;margin-left: 30px;display: none;" id="recall-btn">撤回共享</button>
+                    <label id="cur-doc-info" style="display: none;"></label>
+                </div>
             </form>
           
 
@@ -78,7 +141,61 @@
     </div>
 
 
+    <!-- 一个登录的响应模态框 -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel">登录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="close-login-modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="login-form">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">用户名</label>
+                            <input type="text" class="form-control" name="username" id="username" required placeholder="一个个性的名字">
+                        </div>
+                        <div class="mb-3">
+                            <label for="serIP" class="form-label">服务器IP</label>
+                            <!-- 使用正则表达式进行ip模式匹配 -->
+                            <input type="text" class="form-control" name="serIP" id="serIP" required placeholder="输入服务器的IPv4地址" pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$">
+                        </div>
+                        <div class="mb-3">
+                            <label for="serPort" class="form-label">服务器端口号</label>
+                            <input type="text" class="form-control" name="serPort" id="serPort" required placeholder="输入服务器的监听端口号">
+                        </div>
+                        <button type="button" class="btn btn-primary w-100" id="loginbtn">Login</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 一个提示的响应模态框, 提示内容视情况而定 -->
+    <div class="modal slide-top" id="informModal" tabindex="-1" aria-labelledby="informModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="infromModalLabel">通知</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="item-card card-body d-flex justify-content-between align-items-center p-1">
+                            <div class="doc-info" id="inform-content" style="max-width: 320px;">通知信息</div>
+                            <button class="btn verify-button" type="button" data-bs-dismiss="modal" aria-label="Close">确认</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../static/front.js"></script>
+
     
 </body>
 </html>

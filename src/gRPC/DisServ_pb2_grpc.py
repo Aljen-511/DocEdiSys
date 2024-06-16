@@ -85,7 +85,7 @@ class DisServServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def login(self, request, context):
-        """用户申请登录与离线的rpc
+        """用户申请登录与离线的rpc, 离线可能并没有什么用
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -119,21 +119,22 @@ class DisServServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def request_for_document(self, request, context):
-        """用户请求文档的流rpc 
+        """用户请求文档的流rpc √
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def request_for_patch(self, request, context):
-        """用户轮询补丁的流rpc,request里的patch_item是空的, 只有时间戳和请求文档信息
+        """用户轮询补丁的流rpc,request里的patch_item是空的, 只有时间戳和请求文档信息 √
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def request_for_sharelist(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """用户主动请求共享文档列表 √
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
