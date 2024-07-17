@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+
+package DisServ;
+
+service DisServ {
+  // 用户申请登录与离线的rpc, 离线可能并没有什么用
+  rpc login(usr_info) returns (login_res);
+  rpc logout(usr_info) returns (boolen_res);
+
+  // 用户上传文档的流rpc √
+  rpc upload_document(document) returns (boolen_res);
+  // 用户召回文档的rpc √
+  rpc recall_document(document_info) returns (boolen_res);
+  // 用户上传补丁的rpc √
+  rpc upload_patch(patch) returns (boolen_res);
+  // 用户请求文档的流rpc √
+  rpc request_for_document(document_info) returns(document);
+  // 用户轮询补丁的流rpc,request里的patch_item是空的, 只有时间戳和请求文档信息 √
+  rpc request_for_patch(patch) returns(stream patch);
+  // 用户主动请求共享文档列表 √
+  rpc request_for_sharelist(boolen_res) returns(doc_list);
+}
+
+
+
+message single_patch_item {
+  int64 op = 1;
+  int64 start_line = 2;
+  int64 cont_line = 3;
+  repeated string cont = 4;
+}
+
+
+message patch {
+  int64 time_stamp = 1;
+  usr_info appli_usr = 2;
+  document_info appli_doc = 3;
+  repeated single_patch_item items = 4;
+}
+
+
+message boolen_res{
+  bool accept_status = 1;
+}
+
+message usr_info{
+  string usr_name = 1;
+  int64 usr_ID = 2;
+}
+
+message login_res{
+  bool login_status = 1;
+  int64 usr_ID = 2;
+}
+
+message document{
+  document_info doc_info = 1;
+  int64 time_stamp = 2;
+  repeated string content = 3;
+}
+
+// 三元组唯一地标识一个文档(对服务器而言)
+message document_info{
+  string doc_name = 1;
+  string doc_descriptor = 2;
+  int64 doc_ownerID = 3;
+}
+
+message doc_list{
+  repeated document_info doc_info_list = 1;
+}
+
+
+// 四元组唯一地标识一个文档(对用户而言)
+message unique_doc_indicator{
+  document_info doc_info = 1;
+  string ser_IP = 2;
+}
+// python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=.  DisServ.proto
